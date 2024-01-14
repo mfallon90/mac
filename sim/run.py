@@ -21,6 +21,9 @@ def test(top, test):
     cocotb_test.simulator.run(
         verilog_sources=[
             os.path.join(hdl_dir,"rgmii_rx.sv"),
+            os.path.join(dep_dir,"primitives/async_fifo/hdl/async_fifo.v"),
+            os.path.join(dep_dir,"primitives/async_fifo/hdl/bin_gry_ctr.v"),
+            os.path.join(dep_dir,"primitives/async_fifo/hdl/fifo_bram.v"),
         ],
         toplevel=top,
         module=test
