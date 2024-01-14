@@ -11,4 +11,5 @@ simulation:
 git_dependencies:
   - name: "cocotb_helpers"
     branch: "master"
-
+  - name: "primitives"
+    branch: "master"
