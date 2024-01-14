@@ -1,0 +1,4 @@
+
+deps/
+**/__pycache__/
+**/sim_build/

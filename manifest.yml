@@ -1,0 +1,14 @@
+
+rtl:
+  - name: "rmii_rx.v"
+  - name: "rgmii_rx.sv"
+
+simulation:
+  - name: "rgmii"
+    top: "rgmii_rx.sv"
+    sim: "test_rgmii_rx.py"
+
+git_dependencies:
+  - name: "cocotb_helpers"
+    branch: "master"
+
