@@ -1,5 +1,5 @@
 import os
-from cocotb_test.simulator import run
+import cocotb_test.simulator
 import sys
 
 
@@ -18,7 +18,7 @@ modules = ["test_rgmii_rx"]
 
 def test(top, test):
     os.chdir(sim_dir)
-    run(
+    cocotb_test.simulator.run(
         verilog_sources=[
             os.path.join(hdl_dir,"rgmii_rx.sv"),
         ],
