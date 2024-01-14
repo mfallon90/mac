@@ -17,6 +17,7 @@ top = "rgmii_rx"
 modules = ["test_rgmii_rx"]
 
 def test(top, test):
+    os.chdir(sim_dir)
     run(
         verilog_sources=[
             os.path.join(hdl_dir,"rgmii_rx.sv"),
