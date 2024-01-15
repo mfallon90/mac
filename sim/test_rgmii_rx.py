@@ -1,12 +1,16 @@
 
 import random
 import cocotb
+import cocotb_bus
 import logging
-import sys
-from cocotb_helpers import RgmiiDriver, DataValidMonitor
+import sys 
+from cocotb_bus.monitors.avalon import AvalonSTPkts as AvalonStMonitor
+from cocotb_bus.scoreboard import Scoreboard
+from cocotb_helpers import RgmiiDriver, EtherFrame
 from cocotb.clock import Clock
 from cocotb.queue import Queue
 from cocotb.triggers import Timer, RisingEdge, ClockCycles, First, Combine
+
 
 NUM_WORDS   = 200
 
@@ -24,36 +28,26 @@ class TB():
         self.log.setLevel(logging.DEBUG)
         self.sb = Queue()
         self._checker = None
+        self.scoreboard = Scoreboard(dut)
+        self.expected = []
+        self.ether = EtherFrame()
 
         self.dut.rx_rgmii_data.value = 0
         self.dut.rx_rgmii_ctl.value = 0
         self.rx_rgmii_clk = self.dut.rx_rgmii_clk
-        self.sys_clk = self.dut.sys_clk
+        self.mac_clk = self.dut.mac_clk
 
         self.rgmii_driver = RgmiiDriver(self.rx_rgmii_clk, self.dut.rx_rgmii_data, self.dut.rx_rgmii_ctl)
-        self.monitor = DataValidMonitor(self.sys_clk, self.dut.rx_data, self.dut.rx_data_valid)
+        self.monitor = AvalonStMonitor(self.dut, "mac", self.mac_clk)
+        self.scoreboard.add_interface(self.monitor, self.expected)
 
         cocotb.start_soon(Clock(self.rx_rgmii_clk, 10, units='ns').start())
-        cocotb.start_soon(Clock(self.sys_clk, 10, units='ns').start())
-        cocotb.start_soon(cycle_rst_n(self.dut.sys_rst_n, self.sys_clk))
+        cocotb.start_soon(Clock(self.mac_clk, 10, units='ns').start())
+        cocotb.start_soon(cycle_rst_n(self.dut.mac_rst_n, self.mac_clk))
 
-    async def start(self):
-        if self._checker is not None:
-            raise RuntimeError("Monitor already started")
-        self.monitor.start()
-        self._checker = cocotb.start_soon(self._check())
-
-    async def _check(self):
-        while True:
-            actual = await self.monitor.values.get()
-            expected = await self.sb.get()
-            if actual != expected:
-                self.log.info("Actual:   {}".format(hex(int(actual))))
-                self.log.info("Expected: {}".format(hex(int(expected))))
-            assert actual == expected
         
 def percent_generator(x):
-    return random.randint(1,100) < x
+    return random.randint(1,100) <= x
 
 async def cycle_rst_n(rst_n, clk):
     rst_n.setimmediatevalue(0)
@@ -66,20 +60,17 @@ async def test_rgmii_rx(dut):
     '''Test for rgmii receiver'''
 
     tb = TB(dut)
-    await tb.start()
 
-    await ClockCycles(tb.sys_clk, 100)
+    await ClockCycles(tb.mac_clk, 100)
 
-    num_bytes = 2000
+    num_frames = 5
 
-    for _ in range(num_bytes):
-        rand_byte = random.randint(0,255)
-        valid = percent_generator(85)
-        error = percent_generator(15)
-        if valid:
-            await tb.sb.put(rand_byte)
-        await tb.rgmii_driver.send_byte(rand_byte, valid, error)
+    for _ in range(num_frames):
+        frame = tb.ether.gen_frame()
+        tb.expected.append(frame)
+        await tb.rgmii_driver.send_frame(tb.ether.preamble+frame)
+        await ClockCycles(tb.rx_rgmii_clk, random.randint(tb.ether.ifg,200))
 
-    await ClockCycles(tb.sys_clk, 20)
+    await ClockCycles(tb.mac_clk, 20)
     dut._log.info('Test done')
 
