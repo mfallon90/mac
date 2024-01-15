@@ -26,6 +26,7 @@ def test(top, test):
             os.path.join(dep_dir,"primitives/async_fifo/hdl/async_fifo.v"),
             os.path.join(dep_dir,"primitives/async_fifo/hdl/bin_gry_ctr.v"),
             os.path.join(dep_dir,"primitives/async_fifo/hdl/fifo_bram.v"),
+            os.path.join(dep_dir,"primitives/delay/hdl/delay.sv"),
         ],
         toplevel=top,
         module=test

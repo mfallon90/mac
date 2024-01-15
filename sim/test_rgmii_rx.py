@@ -63,12 +63,13 @@ async def test_rgmii_rx(dut):
 
     await ClockCycles(tb.mac_clk, 100)
 
-    num_frames = 5
+    num_frames = 50
 
     for _ in range(num_frames):
-        frame = tb.ether.gen_frame(max_size=50)
+        frame = tb.ether.gen_frame(max_size=500)
+        crc = tb.ether.get_crc32(frame)
         tb.expected.append(frame)
-        await tb.rgmii_driver.send_frame(tb.ether.preamble+frame)
+        await tb.rgmii_driver.send_frame(tb.ether.preamble + frame + crc)
         await ClockCycles(tb.rx_rgmii_clk, random.randint(tb.ether.ifg,200))
 
     await ClockCycles(tb.mac_clk, 20)
