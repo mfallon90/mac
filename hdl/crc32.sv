@@ -46,10 +46,6 @@ module crc32 #(
         stream3 <= stream4;
         stream4 <= stream5;
     end
-    
-    alway_ff @(posedge clk) begin
-
-    end
 
     generate
         for (genvar i=0; i<8; i=i+1)
