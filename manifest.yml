@@ -13,3 +13,5 @@ git_dependencies:
     branch: "master"
   - name: "primitives"
     branch: "master"
+  - name: "fpga_board_constraints"
+    branch: "master"
