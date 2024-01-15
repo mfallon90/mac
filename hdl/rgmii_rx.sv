@@ -8,38 +8,54 @@
 //
 //////////////////////////////////////////////////////////////////////////////////
 
-module rgmii_rx
-    (
-    input  wire            sys_clk,
-    input  wire            sys_rst_n,
-    output logic           rx_data_valid,
-    output logic           rx_data_error,
-    output logic [7:0]     rx_data,
+module rgmii_rx #(
+    parameter int   DATA_WIDTH = 8
+    )(
+    input  wire                     mac_clk,
+    input  wire                     mac_rst_n,
+    output logic                    mac_startofpacket,
+    output logic                    mac_endofpacket,
+    output logic                    mac_valid,
+    output logic [DATA_WIDTH-1:0]   mac_data,
+    output logic                    mac_error,
 
-    input  wire            rx_rgmii_clk,
-    input  wire  [3:0]     rx_rgmii_data,
-    input  wire            rx_rgmii_ctl
+    input  wire                     rx_rgmii_clk,
+    input  wire  [3:0]              rx_rgmii_data,
+    input  wire                     rx_rgmii_ctl
     );
 
-    typedef struct packed {
-        logic [7:0] data;
-        logic       error;
-    } fifo_t;
-    
-    fifo_t wr_data;
-    fifo_t rd_data;
-    logic               wr_data_valid;
-    logic               rd_data_valid;
-    logic               wr_rst_n;
-    logic               wr_rst_n_d;
+    localparam logic [7:0]  SFD = 8'hD5;
 
-    logic [3:0]         lower_nibble;
-    logic [3:0]         upper_nibble;
-    logic               rx_rgmii_dv;
-    logic               rx_rgmii_err;
+    typedef struct packed {
+        logic                   startofpacket;
+        logic                   endofpacket;
+        logic                   valid;
+        logic                   error;
+        logic [DATA_WIDTH-1:0]  data;
+    } fifo_t;
+
+    typedef enum {
+        S_IDLE,
+        S_IN_PACKET
+    } state_t;
+
+    state_t         state;
+    fifo_t          wr_data;
+    fifo_t          rd_data;
+    logic           wr_rst_n;
+    logic           wr_rst_n_d;
+    logic [3:0]     lower_nibble;
+    logic [3:0]     upper_nibble;
+    logic           rx_rgmii_dv;
+    logic           rx_rgmii_err;
+    logic           data_valid;
+    logic           data_error;
+    logic [7:0]     data;
+    logic           startofpacket;
+    logic           endofpacket;
 
     always_ff @(posedge rx_rgmii_clk) begin
-        wr_rst_n_d <= sys_rst_n;
+        wr_rst_n_d <= mac_rst_n;
         wr_rst_n   <= wr_rst_n_d;
     end
 
@@ -54,9 +70,42 @@ module rgmii_rx
     end
 
     always_ff @(posedge rx_rgmii_clk) begin
-        wr_data_valid   <= rx_rgmii_dv;
-        wr_data.error   <= rx_rgmii_err;
-        wr_data.data    <= {upper_nibble, lower_nibble};
+        data_valid <= rx_rgmii_dv;
+        data_error <= rx_rgmii_err;
+        data       <= {upper_nibble, lower_nibble};
+    end
+
+    always_ff @(posedge rx_rgmii_clk) begin
+        if (wr_rst_n == 0) begin
+            state         <= S_IDLE;
+            startofpacket <= 'x;
+            endofpacket   <= 'x;
+            wr_data       <= 'x;
+            wr_data.valid <= '0;
+        end
+        startofpacket         <= 1'b0;
+        endofpacket           <= 1'b0;
+        wr_data.startofpacket <= startofpacket;
+        wr_data.endofpacket   <= endofpacket;
+        wr_data.data          <= data;
+        wr_data.error         <= data_error;
+
+        case (state)
+            S_IDLE: begin
+                wr_data.valid   <= 1'b0;
+                if (data_valid == 1 && data == SFD) begin
+                    startofpacket <= 1'b1;
+                    state         <= S_IN_PACKET;
+                end
+            end
+            S_IN_PACKET: begin
+                wr_data.valid   <= data_valid;
+                if (data_valid != rx_rgmii_dv) begin
+                    wr_data.endofpacket <= 1'b1;
+                    state               <= S_IDLE;
+                end
+            end
+        endcase
     end
 
     async_fifo #(
@@ -66,18 +115,20 @@ module rgmii_rx
         .wr_clk     (rx_rgmii_clk),
         .wr_rst_n   (wr_rst_n),
         .wr_data    (wr_data),
-        .wr_vld     (wr_data_valid),
+        .wr_vld     (1'b1),
         .wr_rdy     (), // NC
-        .rd_clk     (sys_clk),
-        .rd_rst_n   (sys_rst_n),
+        .rd_clk     (mac_clk),
+        .rd_rst_n   (mac_rst_n),
         .rd_data    (rd_data),
-        .rd_vld     (rd_data_valid),
+        .rd_vld     (), // NC
         .rd_rdy     (1'b1)
     );
 
-    assign rx_data       = rd_data.data;
-    assign rx_data_error = rd_data.error;
-    assign rx_data_valid = rd_data_valid;
+    assign mac_startofpacket = rd_data.startofpacket;
+    assign mac_endofpacket   = rd_data.endofpacket;
+    assign mac_valid         = rd_data.valid;
+    assign mac_data          = rd_data.data;
+    assign mac_error         = rd_data.error;
 
     initial begin
         $dumpfile("rgmii_rx.vcd");
