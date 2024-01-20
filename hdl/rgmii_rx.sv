@@ -71,7 +71,7 @@ module rgmii_rx #(
 
     always_ff @(posedge rx_rgmii_clk) begin
         data_valid <= rx_rgmii_dv;
-        data_error <= rx_rgmii_err;
+        data_error <= rx_rgmii_err ^ rx_rgmii_dv;
         data       <= {upper_nibble, lower_nibble};
     end
 

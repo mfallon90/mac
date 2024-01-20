@@ -26,7 +26,24 @@ module mimas_a7_top #(
     output logic        rgmii_tx_ctl,
     input  wire         rgmii_tx_clk
     );
+
+    logic   mac_clk;
+
+    clk_wiz_0 i_clk_wiz (
+        .reset      (sys_rst),
+        .clk_in1    (sys_clk),
+        .clk_out1   (mac_clk)
+    );
+
+    typedef struct packed {
+        logic        startofpacket;
+        logic        endofpacket;
+        logic        valid;
+        logic [7:0]  data;
+        logic        error;
+    } stream_t;
     
+    stream_t stream;
     logic rst, rst_d;
     logic rst_n, rst_n_d;
     always_ff @(posedge sys_clk) begin
@@ -37,22 +54,37 @@ module mimas_a7_top #(
     end
 
     rgmii i_rgmii (
-        .mac_clk    (sys_clk),
-        .mac_rst_n  (rst_n),
-        .mac_startofpacket  (seven_seg_en[0]),
-        .mac_endofpacket    (seven_seg_en[1]),
-        .mac_valid          (seven_seg_en[2]),
-        .mac_data           (seven_seg_led),
-        .mac_error          (seven_seg_en[3]),
-        .rx_rgmii_clk       (rgmii_rx_clk),
-        .rx_rgmii_data      (rgmii_rx_data),
-        .rx_rgmii_ctl       (rgmii_rx_ctl)
+        .mac_clk           (mac_clk),
+        .mac_rst_n         (rst_n),
+        .mac_startofpacket (stream.startofpacket),
+        .mac_endofpacket   (stream.endofpacket),
+        .mac_valid         (stream.valid),
+        .mac_data          (stream.data),
+        .mac_error         (stream.error),
+        .rx_rgmii_clk      (rgmii_rx_clk),
+        .rx_rgmii_data     (rgmii_rx_data),
+        .rx_rgmii_ctl      (rgmii_rx_ctl)
+    );
+
+    ila_wrapper i_ila_wrapper (
+        .mac_clk       (mac_clk),
+        .startofpacket (stream.startofpacket),
+        .endofpacket   (stream.endofpacket),
+        .valid         (stream.valid),
+        .data          (stream.data),
+        .error         (stream.error)
     );
 
     assign led           = '0;
     assign mdc           = '0;
     assign rgmii_tx_data = '0;
     assign rgmii_tx_ctl  = '0;
+    
+    assign seven_seg_en[0] = stream.startofpacket;
+    assign seven_seg_en[1] = stream.endofpacket;
+    assign seven_seg_en[2] = stream.valid;
+    assign seven_seg_en[3] = stream.error;
+    assign seven_seg_led   = stream.data;
 
     // initial begin
     //     $dumpfile("crc32.vcd");
