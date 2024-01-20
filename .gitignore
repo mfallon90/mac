@@ -4,3 +4,4 @@ deps/
 **/sim_build/
 *.gtkw
 build/
+*.log
