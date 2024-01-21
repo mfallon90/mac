@@ -42,17 +42,17 @@ module rgmii_rx #(
     state_t         state;
     fifo_t          wr_data;
     fifo_t          rd_data;
-    logic           wr_rst_n;
-    logic           wr_rst_n_d;
-    logic [3:0]     lower_nibble;
-    logic [3:0]     upper_nibble;
-    logic           rx_rgmii_dv;
-    logic           rx_rgmii_err;
     logic           data_valid;
     logic           data_error;
     logic [7:0]     data;
     logic           startofpacket;
     logic           endofpacket;
+    (* keep = "true" *) logic           wr_rst_n;
+    (* keep = "true" *) logic           wr_rst_n_d;
+    (* keep = "true" *) logic [3:0]     lower_nibble;
+    (* keep = "true" *) logic [3:0]     upper_nibble;
+    (* keep = "true" *) logic           rx_rgmii_dv;
+    (* keep = "true" *) logic           rx_rgmii_err;
 
     always_ff @(posedge rx_rgmii_clk) begin
         wr_rst_n_d <= mac_rst_n;
@@ -108,8 +108,34 @@ module rgmii_rx #(
         endcase
     end
 
+    generate
+        if (0) begin
+            logic rgmii_ila_clk;
+
+            clk_wiz_1 i_clk_wiz (
+                .clk_in1  (rx_rgmii_clk),
+                .clk_out1 (rgmii_ila_clk)
+            );
+
+            ila_0 i_ila (
+                .clk    (rgmii_ila_clk),
+                .probe0 (rx_rgmii_clk),
+                .probe1 (rx_rgmii_data),
+                .probe2 (rx_rgmii_ctl),
+                .probe3 (data_valid),
+                .probe4 (data_error),
+                .probe5 (data),
+                .probe6 (wr_data.startofpacket),
+                .probe7 (wr_data.endofpacket),
+                .probe8 (wr_data.valid),
+                .probe9 (wr_data.data),
+                .probe10(wr_data.error)
+            );
+        end
+    endgenerate
+
     async_fifo #(
-        .P_DEPTH    (16),
+        .P_DEPTH    (256),
         .P_WIDTH    ($bits(fifo_t))
     ) i_async_fifo (
         .wr_clk     (rx_rgmii_clk),

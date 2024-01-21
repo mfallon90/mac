@@ -53,6 +53,28 @@ module crc32 #(
         .data_out   (stream_reg)
     );
 
+    generate
+        if (0) begin
+            ila_1 i_ila (
+                .clk    (clk),
+                .probe0 (stream_in_startofpacket),
+                .probe1 (stream_in_endofpacket),
+                .probe2 (stream_in_valid),
+                .probe3 (stream_in_data),
+                .probe4 (stream_in_error),
+                .probe5 (state),
+                .probe6 (crc_d),
+                .probe7 (crc_q),
+                .probe8 (crc_valid),
+                .probe9 (stream_out_startofpacket),
+                .probe10(stream_out_endofpacket),
+                .probe11(stream_out_valid),
+                .probe12(stream_out_data),
+                .probe13(stream_out_error)
+            );
+        end
+    endgenerate
+
     assign crc_valid = (crc_d == P_RESIDUE);
 
     generate

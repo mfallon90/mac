@@ -44,14 +44,16 @@ module mimas_a7_top #(
     } stream_t;
     
     stream_t stream;
-    logic rst, rst_d;
-    logic rst_n, rst_n_d;
-    always_ff @(posedge sys_clk) begin
-        rst_d   <= sys_rst;
-        rst_n_d <= ~sys_rst;
-        rst     <= rst_d;
-        rst_n   <= rst_n_d;
-    end
+    logic rst, rst_n;
+
+    delay #(
+        .NUM_CYCLES     (4),
+        .WIDTH          (2)
+    ) i_rst_delay (
+        .clk        (mac_clk),
+        .data_in    ({sys_rst, ~sys_rst}),
+        .data_out   ({rst,      rst_n})
+    );
 
     rgmii i_rgmii (
         .mac_clk           (mac_clk),
@@ -66,14 +68,18 @@ module mimas_a7_top #(
         .rx_rgmii_ctl      (rgmii_rx_ctl)
     );
 
-    ila_wrapper i_ila_wrapper (
-        .mac_clk       (mac_clk),
-        .startofpacket (stream.startofpacket),
-        .endofpacket   (stream.endofpacket),
-        .valid         (stream.valid),
-        .data          (stream.data),
-        .error         (stream.error)
-    );
+    generate
+        if (1) begin
+            ila_wrapper i_ila_wrapper (
+                .mac_clk       (mac_clk),
+                .startofpacket (stream.startofpacket),
+                .endofpacket   (stream.endofpacket),
+                .valid         (stream.valid),
+                .data          (stream.data),
+                .error         (stream.error)
+            );
+        end
+    endgenerate
 
     assign led           = '0;
     assign mdc           = '0;
