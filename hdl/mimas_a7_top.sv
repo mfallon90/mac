@@ -70,9 +70,9 @@ module mimas_a7_top #(
         .mac_valid         (stream.valid),
         .mac_data          (stream.data),
         .mac_error         (stream.error),
-        .rx_rgmii_clk      (rgmii_rx_clk),
-        .rx_rgmii_data     (rgmii_rx_data),
-        .rx_rgmii_ctl      (rgmii_rx_ctl)
+        .rgmii_rx_clk      (rgmii_rx_clk),
+        .rgmii_rx_data     (rgmii_rx_data),
+        .rgmii_rx_ctl      (rgmii_rx_ctl)
     );
 
     logic valid;

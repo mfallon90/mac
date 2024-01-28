@@ -12,9 +12,9 @@ module rgmii #(
     output logic [DATA_WIDTH-1:0]   mac_data,
     output logic                    mac_error,
 
-    input  wire                     rx_rgmii_clk,
-    input  wire  [3:0]              rx_rgmii_data,
-    input  wire                     rx_rgmii_ctl
+    input  wire                     rgmii_rx_clk,
+    input  wire  [3:0]              rgmii_rx_data,
+    input  wire                     rgmii_rx_ctl
     );
 
     typedef struct packed {
@@ -39,9 +39,9 @@ module rgmii #(
         .mac_valid         (stream0.valid),
         .mac_data          (stream0.data),
         .mac_error         (stream0.error),
-        .rx_rgmii_clk      (rx_rgmii_clk),
-        .rx_rgmii_data     (rx_rgmii_data),
-        .rx_rgmii_ctl      (rx_rgmii_ctl)
+        .rgmii_rx_clk      (rgmii_rx_clk),
+        .rgmii_rx_data     (rgmii_rx_data),
+        .rgmii_rx_ctl      (rgmii_rx_ctl)
     );
 
     crc32 i_crc32 (
