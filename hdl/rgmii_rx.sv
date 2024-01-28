@@ -20,13 +20,12 @@ module rgmii_rx #(
     output logic [DATA_WIDTH-1:0]   mac_data,
     output logic                    mac_error,
 
-    input  wire                     rx_rgmii_clk,
-    input  wire  [3:0]              rx_rgmii_data,
-    input  wire                     rx_rgmii_ctl
+    input  wire                     rgmii_rx_clk,
+    input  wire  [3:0]              rgmii_rx_data,
+    input  wire                     rgmii_rx_ctl
     );
 
     localparam logic [7:0]  SFD = 8'hD5;
-    logic rx_clk;
 
     typedef struct packed {
         logic                   startofpacket;
@@ -41,82 +40,31 @@ module rgmii_rx #(
         S_IN_PACKET
     } state_t;
 
-    (* keep = "true" *) state_t         state;
-    (* keep = "true" *) fifo_t          wr_data;
-    (* keep = "true" *) fifo_t          rd_data;
-    (* keep = "true" *) logic           data_valid;
-    (* keep = "true" *) logic           data_error;
-    (* keep = "true" *) logic [7:0]     data;
-    (* keep = "true" *) logic           startofpacket;
-    (* keep = "true" *) logic           endofpacket;
-    (* keep = "true" *) logic           wr_rst_n;
-    (* keep = "true" *) logic           wr_rst_n_d;
-    (* keep = "true" *) logic [3:0]     lower_nibble;
-    (* keep = "true" *) logic [3:0]     lower_nibble_d;
-    (* keep = "true" *) logic [3:0]     upper_nibble;
-    (* keep = "true" *) logic [3:0]     upper_nibble_d;
-    (* keep = "true" *) logic           rx_rgmii_dv;
-    (* keep = "true" *) logic           rx_rgmii_err;
+    logic           rx_clk;
+    state_t         state;
+    fifo_t          wr_data;
+    fifo_t          rd_data;
+    logic           rx_valid;
+    logic           rx_valid_comb;
+    logic           rx_error;
+    logic [7:0]     rx_data;
+    logic           startofpacket;
+    logic           endofpacket;
+    logic           wr_rst_n;
 
-    generate
-        // if (SIM == 0) begin: g_synth_rx_data
-        if (1) begin: g_synth_rx_data
-            BUFG i_BUFG_rgmii_rx (
-                .I (rx_rgmii_clk),
-                .O (rx_clk)
-            );
-            for (genvar i=0; i<4; i=i+1) begin
-                IDDR #(
-                   .DDR_CLK_EDGE("SAME_EDGE_PIPELINED"),
-                   .SRTYPE("ASYNC")
-                ) i_IDDR (
-                   .Q1 (lower_nibble[i]),
-                   .Q2 (upper_nibble[i]),
-                   .C  (rx_clk),
-                   .CE (1),
-                   .D  (rx_rgmii_data[i]),
-                   .R  (0),
-                   .S  (0)
-                );
-            end
+    rgmii_ddr #(
+        .SIM    (SIM)
+    ) i_rgmii_ddr (
+        .ddr_clk_in     (rgmii_rx_clk),
+        .ddr_data_in    (rgmii_rx_data),
+        .ddr_ctl_in     (rgmii_rx_ctl),
+        .ddr_clk_out    (rx_clk),
+        .ddr_data_out   (rx_data),
+        .ddr_valid      (rx_valid),
+        .ddr_valid_comb (rx_valid_comb),
+        .ddr_error      (rx_error)
+    );
 
-            IDDR #(
-               .DDR_CLK_EDGE("SAME_EDGE_PIPELINED"),
-               .SRTYPE("ASYNC")
-            ) i_IDDR_ctl (
-               .Q1 (rx_rgmii_dv),
-               .Q2 (rx_rgmii_err),
-               .C  (rx_clk),
-               .CE (1),
-               .D  (rx_rgmii_ctl),
-               .R  (0),
-               .S  (0)
-            );
-
-        end else begin: g_sim_rx_data
-            assign rx_clk = rx_rgmii_clk;
-            always_ff @(posedge rx_clk) begin
-                lower_nibble    <= rx_rgmii_data;
-                rx_rgmii_dv     <= rx_rgmii_ctl;
-            end
-
-            always_ff @(negedge rx_clk) begin
-                upper_nibble    <= rx_rgmii_data;
-                rx_rgmii_err    <= rx_rgmii_ctl;
-            end
-        end
-    endgenerate
-
-    always_ff @(posedge rx_clk) begin
-        data_valid <= rx_rgmii_dv;
-        data_error <= rx_rgmii_err ^ rx_rgmii_dv;
-        data       <= {upper_nibble, lower_nibble};
-    end
-
-    always_ff @(posedge rx_clk) begin
-        wr_rst_n_d <= mac_rst_n;
-        wr_rst_n   <= wr_rst_n_d;
-    end
 
     always_ff @(posedge rx_clk) begin
         if (wr_rst_n == 0) begin
@@ -130,20 +78,20 @@ module rgmii_rx #(
         endofpacket           <= 1'b0;
         wr_data.startofpacket <= startofpacket;
         wr_data.endofpacket   <= endofpacket;
-        wr_data.data          <= data;
-        wr_data.error         <= data_error;
+        wr_data.data          <= rx_data;
+        wr_data.error         <= rx_error;
 
         case (state)
             S_IDLE: begin
                 wr_data.valid   <= 1'b0;
-                if (data_valid == 1 && data == SFD) begin
+                if (rx_valid == 1 && rx_data == SFD) begin
                     startofpacket <= 1'b1;
                     state         <= S_IN_PACKET;
                 end
             end
             S_IN_PACKET: begin
-                wr_data.valid   <= data_valid;
-                if (data_valid != rx_rgmii_dv) begin
+                wr_data.valid   <= rx_valid;
+                if (rx_valid != rx_valid_comb) begin
                     wr_data.endofpacket <= 1'b1;
                     state               <= S_IDLE;
                 end
@@ -163,11 +111,11 @@ module rgmii_rx #(
             ila_0 i_ila (
                 .clk    (rgmii_ila_clk),
                 .probe0 (rx_clk),
-                .probe1 (rx_rgmii_data),
-                .probe2 (rx_rgmii_ctl),
-                .probe3 (data_valid),
-                .probe4 (data_error),
-                .probe5 (data),
+                .probe1 (rgmii_rx_data),
+                .probe2 (rgmii_rx_ctl),
+                .probe3 (rx_valid),
+                .probe4 (rx_error),
+                .probe5 (rx_data),
                 .probe6 (wr_data.startofpacket),
                 .probe7 (wr_data.endofpacket),
                 .probe8 (wr_data.valid),
@@ -178,7 +126,7 @@ module rgmii_rx #(
     endgenerate
 
     async_fifo #(
-        .P_DEPTH    (1024),
+        .P_DEPTH    (64),
         .P_WIDTH    ($bits(fifo_t))
     ) i_async_fifo (
         .wr_clk     (rx_clk),
