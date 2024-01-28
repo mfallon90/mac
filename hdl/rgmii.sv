@@ -1,7 +1,8 @@
 `timescale 1ns / 1ps
 
 module rgmii #(
-    parameter int    DATA_WIDTH = 8
+    parameter int DATA_WIDTH = 8,
+    parameter int SIM = 0
     )(
     input  wire                     mac_clk,
     input  wire                     mac_rst_n,
@@ -28,7 +29,8 @@ module rgmii #(
     stream_t stream1;
 
     rgmii_rx #(
-        .DATA_WIDTH (DATA_WIDTH)
+        .DATA_WIDTH (DATA_WIDTH),
+        .SIM        (SIM)
     ) i_rgmii_rx (
         .mac_clk           (mac_clk),
         .mac_rst_n         (mac_rst_n),
